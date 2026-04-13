@@ -69,9 +69,19 @@ export default function Chat() {
   useEffect(() => {
     if (!user) return;
     const channel = supabase.channel("messages-realtime")
-      .on("postgres_changes", { event: "*", schema: "public", table: "messages" }, () => {
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, (payload) => {
+        const newMsg = payload.new as any;
+        // Show notification if the message is received (not sent by current user)
+        if (newMsg.receiver_id === user.id) {
+          toast.info("New message received", {
+            description: newMsg.message?.substring(0, 80) + (newMsg.message?.length > 80 ? "..." : ""),
+          });
+        }
         queryClient.invalidateQueries({ queryKey: ["messages"] });
         queryClient.invalidateQueries({ queryKey: ["unread-count"] });
+      })
+      .on("postgres_changes", { event: "DELETE", schema: "public", table: "messages" }, () => {
+        queryClient.invalidateQueries({ queryKey: ["messages"] });
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
