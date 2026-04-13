@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Send, Trash2, Megaphone } from "lucide-react";
 import { format } from "date-fns";
@@ -40,7 +40,7 @@ export default function Chat() {
   });
 
   // For normal user: find admin to chat with
-  const { data: adminId } = useQuery({
+  const { data: adminId = null } = useQuery({
     queryKey: ["admin-id"],
     queryFn: async () => {
       const { data } = await supabase.from("user_roles").select("user_id").eq("role", "admin").limit(1);
@@ -51,14 +51,14 @@ export default function Chat() {
 
   const partnerId = role === "admin" ? selectedUser : adminId;
 
-  // Messages query - includes direct + broadcast messages for users
+  // Messages query
   const { data: messages = [] } = useQuery({
     queryKey: ["messages", user?.id, partnerId],
     queryFn: async () => {
-      if (!partnerId) return [];
+      if (!user || !partnerId) return [];
       const { data } = await supabase.from("messages")
         .select("*")
-        .or(`and(sender_id.eq.${user!.id},receiver_id.eq.${partnerId}),and(sender_id.eq.${partnerId},receiver_id.eq.${user!.id})`)
+        .or(`and(sender_id.eq.${user.id},receiver_id.eq.${partnerId}),and(sender_id.eq.${partnerId},receiver_id.eq.${user.id})`)
         .order("created_at", { ascending: true });
       return data ?? [];
     },
@@ -96,9 +96,9 @@ export default function Chat() {
 
   const sendMessage = useMutation({
     mutationFn: async () => {
-      if (!message.trim() || !partnerId) return;
+      if (!message.trim() || !partnerId || !user) return;
       const { error } = await supabase.from("messages").insert({
-        sender_id: user!.id,
+        sender_id: user.id,
         receiver_id: partnerId,
         message: message.trim(),
       });
@@ -124,9 +124,9 @@ export default function Chat() {
 
   const sendBroadcast = useMutation({
     mutationFn: async () => {
-      if (!broadcastMsg.trim() || !chatUsers.length) return;
+      if (!broadcastMsg.trim() || !chatUsers.length || !user) return;
       const inserts = chatUsers.map(u => ({
-        sender_id: user!.id,
+        sender_id: user.id,
         receiver_id: u.id,
         message: broadcastMsg.trim(),
         is_broadcast: true,
@@ -143,6 +143,9 @@ export default function Chat() {
     onError: (e: any) => toast.error(e.message),
   });
 
+  const showChat = !!partnerId;
+  const showConnecting = role === "user" && !adminId;
+
   return (
     <div className="flex h-[calc(100vh-3rem)]">
       {/* User list for admin */}
@@ -157,8 +160,10 @@ export default function Chat() {
                 </Button>
               </DialogTrigger>
               <DialogContent>
-                <DialogHeader><DialogTitle>Broadcast Message</DialogTitle></DialogHeader>
-                <p className="text-sm text-muted-foreground">Send a message to all users at once.</p>
+                <DialogHeader>
+                  <DialogTitle>Broadcast Message</DialogTitle>
+                  <DialogDescription>Send a message to all users at once.</DialogDescription>
+                </DialogHeader>
                 <Textarea value={broadcastMsg} onChange={e => setBroadcastMsg(e.target.value)} placeholder="Type your broadcast message..." rows={4} />
                 <Button onClick={() => sendBroadcast.mutate()} disabled={!broadcastMsg.trim() || sendBroadcast.isPending}>
                   {sendBroadcast.isPending ? "Sending..." : "Send Broadcast"}
@@ -180,7 +185,7 @@ export default function Chat() {
 
       {/* Chat area */}
       <div className="flex-1 flex flex-col">
-        {partnerId ? (
+        {showChat ? (
           <>
             <ScrollArea className="flex-1 p-4">
               <div className="space-y-3">
@@ -189,7 +194,7 @@ export default function Chat() {
                     <div className={`max-w-[70%] rounded-lg px-4 py-2 relative group ${
                       m.sender_id === user?.id ? "bg-primary text-primary-foreground" : "bg-muted"
                     }`}>
-                      {(m as any).is_broadcast && (
+                      {m.is_broadcast && (
                         <span className="text-[9px] uppercase tracking-wider opacity-60 block mb-1">📢 Broadcast</span>
                       )}
                       <p className="text-sm">{m.message}</p>
@@ -220,7 +225,7 @@ export default function Chat() {
           </>
         ) : (
           <div className="flex-1 flex items-center justify-center text-muted-foreground">
-            {role === "admin" ? "Select a user to chat with" : "Connecting..."}
+            {showConnecting ? "Connecting to admin..." : role === "admin" ? "Select a user to chat with" : "No admin available"}
           </div>
         )}
       </div>
