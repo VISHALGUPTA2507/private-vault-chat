@@ -160,6 +160,9 @@ export default function AdminFiles() {
                   title={f.file_password ? "Remove password" : "Set password"}>
                   {f.file_password ? <LockOpen className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
                 </Button>
+                <Button variant="ghost" size="sm" onClick={() => { if (confirm(`Delete "${f.file_name}" permanently?`)) deleteFile.mutate(f); }} title="Delete">
+                  <Trash2 className="h-4 w-4 text-destructive" />
+                </Button>
               </div>
             </TableCell>
           </TableRow>
