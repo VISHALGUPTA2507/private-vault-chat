@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Download, Eye, Lock, LockOpen, Upload, Users, ArrowLeft, FolderOpen, FileIcon } from "lucide-react";
+import { Download, Eye, Lock, LockOpen, Upload, Users, ArrowLeft, FolderOpen, FileIcon, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { FilePreviewDialog } from "@/components/FilePreviewDialog";
