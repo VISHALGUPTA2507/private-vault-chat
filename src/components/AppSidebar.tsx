@@ -1,15 +1,17 @@
 import { useAuth } from "@/contexts/AuthContext";
+import { useTheme } from "@/contexts/ThemeContext";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel,
   SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarFooter, useSidebar,
 } from "@/components/ui/sidebar";
-import { MessageSquare, FolderOpen, LayoutDashboard, Users, Trash2, HardDrive, LogOut } from "lucide-react";
+import { MessageSquare, FolderOpen, LayoutDashboard, Users, Trash2, HardDrive, LogOut, Sun, Moon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export function AppSidebar() {
   const { role, displayName, signOut } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
   const location = useLocation();
@@ -53,8 +55,12 @@ export function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
       <SidebarFooter>
-        <div className="p-2">
-          {!collapsed && <p className="text-xs text-muted-foreground mb-2 truncate">{displayName}</p>}
+        <div className="p-2 space-y-2">
+          <Button variant="ghost" size="sm" className="w-full justify-start" onClick={toggleTheme}>
+            {theme === "light" ? <Moon className="h-4 w-4 mr-2" /> : <Sun className="h-4 w-4 mr-2" />}
+            {!collapsed && (theme === "light" ? "Dark Mode" : "Light Mode")}
+          </Button>
+          {!collapsed && <p className="text-xs text-muted-foreground truncate">{displayName}</p>}
           <Button variant="ghost" size="sm" className="w-full justify-start" onClick={signOut}>
             <LogOut className="h-4 w-4 mr-2" />
             {!collapsed && "Sign Out"}
