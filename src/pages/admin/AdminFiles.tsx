@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Download, Eye, Lock, LockOpen, Upload, Users, ArrowLeft, FolderOpen, FileIcon } from "lucide-react";
+import { Download, Eye, Lock, LockOpen, Upload, Users, ArrowLeft, FolderOpen, FileIcon, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { FilePreviewDialog } from "@/components/FilePreviewDialog";
@@ -96,6 +96,20 @@ export default function AdminFiles() {
     onError: (e: any) => toast.error(e.message),
   });
 
+  const deleteFile = useMutation({
+    mutationFn: async (file: any) => {
+      // Delete from storage first, then hard-delete from DB
+      await supabase.storage.from("user-files").remove([file.file_path]);
+      const { error } = await supabase.from("files").delete().eq("id", file.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("File deleted permanently");
+      queryClient.invalidateQueries({ queryKey: ["admin-all-files"] });
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+
   const formatSize = (bytes: number) => {
     if (bytes < 1024) return bytes + " B";
     if (bytes < 1048576) return (bytes / 1024).toFixed(1) + " KB";
@@ -145,6 +159,9 @@ export default function AdminFiles() {
                 <Button variant="ghost" size="sm" onClick={() => { setPasswordDialogFile(f); setFilePassword(""); }}
                   title={f.file_password ? "Remove password" : "Set password"}>
                   {f.file_password ? <LockOpen className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => { if (confirm(`Delete "${f.file_name}" permanently?`)) deleteFile.mutate(f); }} title="Delete">
+                  <Trash2 className="h-4 w-4 text-destructive" />
                 </Button>
               </div>
             </TableCell>
