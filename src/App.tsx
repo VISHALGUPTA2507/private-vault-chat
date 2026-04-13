@@ -1,10 +1,20 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Route, Routes, Navigate } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import Index from "./pages/Index.tsx";
-import NotFound from "./pages/NotFound.tsx";
+import { AuthProvider } from "@/contexts/AuthContext";
+import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { AppLayout } from "@/components/AppLayout";
+import Login from "@/pages/Login";
+import Dashboard from "@/pages/Dashboard";
+import Files from "@/pages/Files";
+import Chat from "@/pages/Chat";
+import ManageUsers from "@/pages/admin/ManageUsers";
+import AdminFiles from "@/pages/admin/AdminFiles";
+import RecycleBin from "@/pages/admin/RecycleBin";
+import StorageMonitor from "@/pages/admin/StorageMonitor";
+import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient();
 
@@ -14,11 +24,22 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Index />} />
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
+        <AuthProvider>
+          <Routes>
+            <Route path="/login" element={<Login />} />
+            <Route path="/" element={<Navigate to="/dashboard" replace />} />
+            <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
+              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/files" element={<Files />} />
+              <Route path="/chat" element={<Chat />} />
+              <Route path="/admin/users" element={<ProtectedRoute adminOnly><ManageUsers /></ProtectedRoute>} />
+              <Route path="/admin/files" element={<ProtectedRoute adminOnly><AdminFiles /></ProtectedRoute>} />
+              <Route path="/admin/recycle-bin" element={<ProtectedRoute adminOnly><RecycleBin /></ProtectedRoute>} />
+              <Route path="/admin/storage" element={<ProtectedRoute adminOnly><StorageMonitor /></ProtectedRoute>} />
+            </Route>
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
