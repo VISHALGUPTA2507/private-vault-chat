@@ -9,8 +9,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
-import { FolderPlus, Upload, Download, Trash2, Folder, FileIcon, ArrowLeft, Lock } from "lucide-react";
+import { FolderPlus, Upload, Download, Trash2, Folder, FileIcon, Lock, Eye } from "lucide-react";
 import { format } from "date-fns";
+import { FilePreviewDialog } from "@/components/FilePreviewDialog";
 
 export default function Files() {
   const { user } = useAuth();
@@ -20,6 +21,8 @@ export default function Files() {
   const [isPrivate, setIsPrivate] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [breadcrumbs, setBreadcrumbs] = useState<{ id: string | null; name: string }[]>([{ id: null, name: "My Files" }]);
+  const [previewFile, setPreviewFile] = useState<any>(null);
+  const [previewOpen, setPreviewOpen] = useState(false);
 
   const { data: folders = [] } = useQuery({
     queryKey: ["folders", user?.id, currentFolder],
@@ -55,9 +58,7 @@ export default function Files() {
     },
     onSuccess: () => {
       toast.success("Folder created");
-      setFolderName("");
-      setIsPrivate(false);
-      setDialogOpen(false);
+      setFolderName(""); setIsPrivate(false); setDialogOpen(false);
       queryClient.invalidateQueries({ queryKey: ["folders"] });
     },
     onError: (e: any) => toast.error(e.message),
@@ -74,7 +75,7 @@ export default function Files() {
         file_name: file.name,
         file_path: filePath,
         file_size: file.size,
-        mime_type: file.type,
+        mime_type: file.type || "application/octet-stream",
       });
       if (dbError) throw dbError;
     },
@@ -185,11 +186,17 @@ export default function Files() {
               <div className="flex items-start gap-3">
                 <FileIcon className="h-8 w-8 text-muted-foreground shrink-0 mt-0.5" />
                 <div className="min-w-0 flex-1">
-                  <p className="font-medium truncate text-sm">{file.file_name}</p>
+                  <p className="font-medium truncate text-sm flex items-center gap-1">
+                    {file.file_name}
+                    {(file as any).file_password && <Lock className="h-3 w-3 text-muted-foreground" />}
+                  </p>
                   <p className="text-xs text-muted-foreground">{formatSize(file.file_size)}</p>
                 </div>
               </div>
               <div className="flex gap-1 mt-3">
+                <Button variant="ghost" size="sm" onClick={() => { setPreviewFile(file); setPreviewOpen(true); }}>
+                  <Eye className="h-3 w-3 mr-1" /> Preview
+                </Button>
                 <Button variant="ghost" size="sm" onClick={() => downloadFile(file.file_path, file.file_name)}>
                   <Download className="h-3 w-3" />
                 </Button>
@@ -208,6 +215,8 @@ export default function Files() {
           <p>No files or folders here yet</p>
         </div>
       )}
+
+      <FilePreviewDialog open={previewOpen} onOpenChange={setPreviewOpen} file={previewFile} />
     </div>
   );
 }
