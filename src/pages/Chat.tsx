@@ -5,8 +5,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Send } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { Send, Trash2, Megaphone } from "lucide-react";
 import { format } from "date-fns";
+import { toast } from "sonner";
 
 interface ChatUser {
   id: string;
@@ -18,6 +21,8 @@ export default function Chat() {
   const queryClient = useQueryClient();
   const [message, setMessage] = useState("");
   const [selectedUser, setSelectedUser] = useState<string | null>(null);
+  const [broadcastOpen, setBroadcastOpen] = useState(false);
+  const [broadcastMsg, setBroadcastMsg] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // For admin: list all non-admin users to chat with
@@ -46,6 +51,7 @@ export default function Chat() {
 
   const partnerId = role === "admin" ? selectedUser : adminId;
 
+  // Messages query - includes direct + broadcast messages for users
   const { data: messages = [] } = useQuery({
     queryKey: ["messages", user?.id, partnerId],
     queryFn: async () => {
@@ -61,19 +67,15 @@ export default function Chat() {
 
   // Real-time subscription
   useEffect(() => {
-    if (!user || !partnerId) return;
+    if (!user) return;
     const channel = supabase.channel("messages-realtime")
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, (payload) => {
-        const msg = payload.new as any;
-        if ((msg.sender_id === user.id && msg.receiver_id === partnerId) ||
-            (msg.sender_id === partnerId && msg.receiver_id === user.id)) {
-          queryClient.invalidateQueries({ queryKey: ["messages", user.id, partnerId] });
-          queryClient.invalidateQueries({ queryKey: ["unread-count"] });
-        }
+      .on("postgres_changes", { event: "*", schema: "public", table: "messages" }, () => {
+        queryClient.invalidateQueries({ queryKey: ["messages"] });
+        queryClient.invalidateQueries({ queryKey: ["unread-count"] });
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [user, partnerId, queryClient]);
+  }, [user, queryClient]);
 
   // Mark messages as read
   useEffect(() => {
@@ -104,8 +106,41 @@ export default function Chat() {
     },
     onSuccess: () => {
       setMessage("");
-      queryClient.invalidateQueries({ queryKey: ["messages", user?.id, partnerId] });
+      queryClient.invalidateQueries({ queryKey: ["messages"] });
     },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  const deleteMessage = useMutation({
+    mutationFn: async (msgId: string) => {
+      const { error } = await supabase.from("messages").delete().eq("id", msgId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Message deleted");
+      queryClient.invalidateQueries({ queryKey: ["messages"] });
+    },
+  });
+
+  const sendBroadcast = useMutation({
+    mutationFn: async () => {
+      if (!broadcastMsg.trim() || !chatUsers.length) return;
+      const inserts = chatUsers.map(u => ({
+        sender_id: user!.id,
+        receiver_id: u.id,
+        message: broadcastMsg.trim(),
+        is_broadcast: true,
+      }));
+      const { error } = await supabase.from("messages").insert(inserts);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Broadcast sent to all users");
+      setBroadcastMsg("");
+      setBroadcastOpen(false);
+      queryClient.invalidateQueries({ queryKey: ["messages"] });
+    },
+    onError: (e: any) => toast.error(e.message),
   });
 
   return (
@@ -113,7 +148,24 @@ export default function Chat() {
       {/* User list for admin */}
       {role === "admin" && (
         <div className="w-64 border-r flex flex-col">
-          <div className="p-3 border-b font-medium text-sm">Conversations</div>
+          <div className="p-3 border-b font-medium text-sm flex items-center justify-between">
+            Conversations
+            <Dialog open={broadcastOpen} onOpenChange={setBroadcastOpen}>
+              <DialogTrigger asChild>
+                <Button variant="ghost" size="icon" title="Broadcast to all">
+                  <Megaphone className="h-4 w-4" />
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader><DialogTitle>Broadcast Message</DialogTitle></DialogHeader>
+                <p className="text-sm text-muted-foreground">Send a message to all users at once.</p>
+                <Textarea value={broadcastMsg} onChange={e => setBroadcastMsg(e.target.value)} placeholder="Type your broadcast message..." rows={4} />
+                <Button onClick={() => sendBroadcast.mutate()} disabled={!broadcastMsg.trim() || sendBroadcast.isPending}>
+                  {sendBroadcast.isPending ? "Sending..." : "Send Broadcast"}
+                </Button>
+              </DialogContent>
+            </Dialog>
+          </div>
           <ScrollArea className="flex-1">
             {chatUsers.map(u => (
               <button key={u.id} onClick={() => setSelectedUser(u.id)}
@@ -134,11 +186,23 @@ export default function Chat() {
               <div className="space-y-3">
                 {messages.map(m => (
                   <div key={m.id} className={`flex ${m.sender_id === user?.id ? "justify-end" : "justify-start"}`}>
-                    <div className={`max-w-[70%] rounded-lg px-4 py-2 ${
+                    <div className={`max-w-[70%] rounded-lg px-4 py-2 relative group ${
                       m.sender_id === user?.id ? "bg-primary text-primary-foreground" : "bg-muted"
                     }`}>
+                      {(m as any).is_broadcast && (
+                        <span className="text-[9px] uppercase tracking-wider opacity-60 block mb-1">📢 Broadcast</span>
+                      )}
                       <p className="text-sm">{m.message}</p>
                       <p className="text-[10px] mt-1 opacity-70">{format(new Date(m.created_at), "HH:mm")}</p>
+                      {role === "admin" && (
+                        <button
+                          onClick={() => deleteMessage.mutate(m.id)}
+                          className="absolute -top-2 -right-2 hidden group-hover:flex bg-destructive text-destructive-foreground rounded-full p-1"
+                          title="Delete message"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </button>
+                      )}
                     </div>
                   </div>
                 ))}

@@ -19,6 +19,7 @@ export type Database = {
           created_at: string
           deleted_at: string | null
           file_name: string
+          file_password: string | null
           file_path: string
           file_size: number
           folder_id: string | null
@@ -33,6 +34,7 @@ export type Database = {
           created_at?: string
           deleted_at?: string | null
           file_name: string
+          file_password?: string | null
           file_path: string
           file_size?: number
           folder_id?: string | null
@@ -47,6 +49,7 @@ export type Database = {
           created_at?: string
           deleted_at?: string | null
           file_name?: string
+          file_password?: string | null
           file_path?: string
           file_size?: number
           folder_id?: string | null
@@ -109,6 +112,7 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          is_broadcast: boolean
           is_read: boolean
           message: string
           receiver_id: string
@@ -117,6 +121,7 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: string
+          is_broadcast?: boolean
           is_read?: boolean
           message: string
           receiver_id: string
@@ -125,6 +130,7 @@ export type Database = {
         Update: {
           created_at?: string
           id?: string
+          is_broadcast?: boolean
           is_read?: boolean
           message?: string
           receiver_id?: string
